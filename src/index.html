@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECU Tuner Studio</title>
+    <style>
+        /* Stili identici a prima, solo puliti */
+        :root { --bg-dark: #0a0a0a; --accent: #00ff88; --text-main: #fff; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; margin: 0; overflow: hidden; }
+        
+        .sidebar { width: 280px; background: #141414; padding: 20px; border-right: 1px solid #333; display: flex; flex-direction: column; }
+        .main { flex-grow: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+        
+        select, button { width: 100%; padding: 10px; margin-bottom: 10px; background: #222; border: 1px solid #444; color: white; cursor: pointer; border-radius: 4px; }
+        button.primary { background: var(--accent); color: black; font-weight: bold; border: none; }
+        
+        /* GAUGE */
+        .gauge-container { position: relative; width: 400px; height: 400px; }
+        .gauge-bg { fill: none; stroke: #222; stroke-width: 30; }
+        .gauge-bar { fill: none; stroke: var(--accent); stroke-width: 30; stroke-linecap: round; stroke-dasharray: 942; stroke-dashoffset: 942; transform: rotate(-225deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.1s; }
+        .val-display { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+        .val-big { font-size: 4rem; font-weight: bold; }
+        
+        .raw-log { position: absolute; bottom: 0; left: 0; right: 0; background: #111; padding: 5px; font-family: monospace; font-size: 0.8rem; color: #666; text-align: center;}
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2 style="color:var(--accent)">ECU TUNER</h2>
+        
+        <label>Interfaccia OBD</label>
+        <select id="ports"><option>Scan...</option></select>
+        <button onclick="scanPorts()">🔄 Aggiorna Lista</button>
+        <button class="primary" onclick="connect()" id="btn-conn">CONNETTI</button>
+        <button onclick="disconnect()" id="btn-disc" style="display:none; background:#d32f2f;">DISCONNETTI</button>
+
+        <hr style="border-color:#333; width:100%; margin: 20px 0;">
+        
+        <label>Strumenti</label>
+        <button onclick="openSim()">🎮 Apri Simulatore</button>
+        <div style="font-size: 0.8rem; color: #888; margin-top: 10px;">
+            Apri il simulatore per creare una centralina virtuale a cui connetterti.
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="gauge-container">
+            <svg width="400" height="400" viewBox="0 0 400 400">
+                <path class="gauge-bg" d="M 80 320 A 170 170 0 1 1 320 320"/>
+                <path id="bar" class="gauge-bar" d="M 80 320 A 170 170 0 1 1 320 320"/>
+            </svg>
+            <div class="val-display">
+                <div class="val-big" id="rpm">0</div>
+                <div style="color:#666">RPM</div>
+                <div style="font-size: 1.5rem; margin-top: 10px;" id="speed">0 KM/H</div>
+            </div>
+        </div>
+        <div class="raw-log" id="log">RAW: --</div>
+    </div>
+
+    <script>
+        let timer = null;
+
+        window.addEventListener('pywebviewready', scanPorts);
+
+        async function scanPorts() {
+            const ports = await pywebview.api.get_ports();
+            const sel = document.getElementById('ports');
+            sel.innerHTML = '';
+            ports.forEach(p => {
+                let opt = document.createElement('option');
+                opt.value = p; opt.innerText = p;
+                sel.appendChild(opt);
+            });
+        }
+
+        async function connect() {
+            const port = document.getElementById('ports').value;
+            const res = await pywebview.api.connect_ecu(port);
+            if(res.status === 'success') {
+                document.getElementById('btn-conn').style.display = 'none';
+                document.getElementById('btn-disc').style.display = 'block';
+                timer = setInterval(updateData, 100);
+            } else {
+                alert(res.msg);
+            }
+        }
+
+        async function disconnect() {
+            await pywebview.api.disconnect();
+            clearInterval(timer);
+            document.getElementById('btn-conn').style.display = 'block';
+            document.getElementById('btn-disc').style.display = 'none';
+            document.getElementById('rpm').innerText = "0";
+            document.getElementById('bar').style.strokeDashoffset = 942;
+        }
+
+        async function updateData() {
+            const data = await pywebview.api.get_data();
+            
+            document.getElementById('rpm').innerText = data.rpm;
+            document.getElementById('speed').innerText = data.speed + " KM/H";
+            document.getElementById('log').innerText = "RAW RX: " + data.raw;
+
+            // Gauge Animation
+            const pct = Math.min(data.rpm / 8000, 1);
+            const offset = 942 - (pct * 942);
+            document.getElementById('bar').style.strokeDashoffset = offset;
+        }
+
+        function openSim() {
+            pywebview.api.open_simulator_window();
+        }
+    </script>
+</body>
+</html>
