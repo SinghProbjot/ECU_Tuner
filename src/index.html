@@ -7,6 +7,11 @@
         :root { --bg: #0a0a0a; --panel: #141414; --accent: #00ff88; --danger: #ff1744; --text: #eee; --border: #333; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; overflow: hidden; }
         
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: #1a1a1a; color: white; padding: 15px 25px; border-radius: 8px; border-left: 5px solid #666; box-shadow: 0 5px 15px rgba(0,0,0,0.5); opacity: 0; transform: translateX(50px); transition: 0.3s; width: 300px; }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast.success { border-color: var(--accent); } .toast.error { border-color: var(--danger); }
+        
         #landing-page { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
         .mode-container { display: flex; gap: 40px; margin-top: 50px; }
         .mode-card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 12px; width: 250px; text-align: center; cursor: pointer; transition: 0.3s; }
@@ -19,7 +24,11 @@
         .nav-item { padding: 15px; cursor: pointer; color: #888; transition: 0.2s; border-radius: 6px; margin-bottom: 5px; }
         .nav-item:hover { background: #222; color: #fff; }
         .nav-item.active { background: #1f2f25; color: var(--accent); border: 1px solid #1f4f35; }
-        
+        .controls { margin-top: auto; }
+        select, button { width: 100%; padding: 10px; margin-bottom: 10px; background: #222; border: 1px solid #444; color: white; cursor: pointer; border-radius: 4px; }
+        button.primary { background: var(--accent); color: black; font-weight: bold; border: none; }
+        button.danger { background: #d32f2f; color: white; border: none; }
+
         .main-area { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle at top right, #111, #000); overflow: hidden; }
         .header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;}
         .content { flex: 1; padding: 30px; overflow-y: auto; display: none; }
@@ -41,18 +50,25 @@
         .sub-tab-item:hover { color: white; }
         .sub-tab-item.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
 
-        .hex-grid { display: grid; grid-template-columns: 80px repeat(16, 1fr); gap: 2px; font-family: monospace; font-size: 0.9rem; margin-top: 20px; user-select: none; }
+        .editor-container { display: flex; gap: 20px; height: 500px;}
+        .map-list-panel { width: 250px; background: #111; border: 1px solid #333; border-radius: 6px; overflow-y: auto; }
+        .map-item { padding: 10px; border-bottom: 1px solid #222; cursor: pointer; font-size: 0.9rem; }
+        .map-item:hover { background: #222; color: var(--accent); }
+        
+        .hex-grid { display: grid; grid-template-columns: 80px repeat(16, 1fr); gap: 2px; font-family: monospace; font-size: 0.9rem; margin-top: 10px; user-select: none; }
         .hex-cell { padding: 5px; text-align: center; background: #0f0f0f; border: 1px solid #222; cursor: pointer; transition: 0.1s; }
         .hex-cell:hover { border-color: var(--accent); background: #1a1a1a; }
         .hex-offset { color: var(--accent); text-align: right; padding-right: 10px; opacity: 0.7; }
         .hex-header { color: #666; text-align: center; padding-bottom: 5px; }
+
+        .map-graph-container { width: 100%; height: 150px; background: #111; border: 1px solid #333; margin-bottom: 10px; position: relative; }
+        canvas { width: 100%; height: 100%; display: block; }
 
         .stage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
         .stage-card { background: #1a1a1a; border: 1px solid var(--border); padding: 20px; border-radius: 8px; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden;}
         .stage-card:hover { border-color: var(--accent); transform: translateY(-2px); }
         .stage-badge { position: absolute; top: 10px; right: 10px; background: #333; padding: 2px 8px; font-size: 0.7rem; border-radius: 4px; }
         
-        /* LIBRARY TABLE */
         .lib-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         .lib-table th { text-align: left; padding: 10px; border-bottom: 1px solid #333; color: #888; }
         .lib-table td { padding: 10px; border-bottom: 1px solid #222; }
@@ -67,7 +83,8 @@
     </style>
 </head>
 <body>
-    <script>if(typeof pywebview==='undefined')window.pywebview={api:{set_mode:async()=>{},get_data:async()=>({rpm:800}),get_status:async()=>({file_loaded:true,filename:"demo.bin",progress:0,logs:[]}),get_hex_view:async()=>[],apply_wizard_stage:async()=>({status:'success'}),get_ecu_info:async()=>({name:"Demo"}),get_library_maps:async()=>[]}};</script>
+    <div id="toast-container"></div>
+    <script>if(typeof pywebview==='undefined')window.pywebview={api:{set_mode:async()=>{},get_data:async()=>({rpm:800,speed:0,temp:90,volt:13.4,throttle:10}),get_status:async()=>({file_loaded:true,filename:"demo.bin",progress:0,logs:[],working:false}),get_hex_view_with_graph:async()=>({current:[],original:[]}),apply_wizard_stage:async()=>({status:'success',msg:'Fatto'}),get_ecu_info:async()=>({name:"Demo"}),get_library_maps:async()=>[],get_defined_maps:async()=>({"Turbo":{"address":100}})}};</script>
 
     <div id="landing-page">
         <h1 style="font-size:3rem; margin-bottom:10px;">ECU TUNER <span style="color:var(--accent)">SUITE</span></h1>
@@ -86,6 +103,14 @@
             <div class="nav-item" id="nav-lib" onclick="nav('lib')">Archivio Mappe</div>
             <div class="nav-item" id="btn-open-sim" onclick="api('open_sim')">Apri Simulatore</div>
             <div class="nav-item" onclick="location.reload()" style="margin-top:auto; color:#d32f2f">🔙 Esci</div>
+
+            <div class="controls" id="real-controls" style="display:none; margin-top:20px; border-top:1px solid #333; padding-top:20px;">
+                <label style="font-size:0.8rem; color:#666;">INTERFACCIA HARDWARE</label>
+                <select id="ports"><option>Scan...</option></select>
+                <button onclick="scanPorts()">🔄 Aggiorna</button>
+                <button class="primary" id="btn-conn" onclick="connect()">CONNETTI</button>
+                <button class="danger" id="btn-disc" onclick="disconnect()" style="display:none;">DISCONNETTI</button>
+            </div>
         </div>
 
         <div class="main-area">
@@ -95,61 +120,70 @@
                 <div id="conn-status" style="color:#666">DISCONNESSO</div>
             </div>
 
-            <!-- DIAGNOSTICA -->
             <div id="page-diag" class="content active">
                 <div class="grid-diag">
                     <div class="card"><div style="color:#666; font-size:0.8rem">GIRI MOTORE</div><div class="card-val" style="color:white"><span id="d-rpm">0</span> rpm</div></div>
                     <div class="card"><div style="color:#666; font-size:0.8rem">VELOCITÀ</div><div class="card-val" style="color:var(--accent)"><span id="d-spd">0</span> km/h</div></div>
                     <div class="card"><div style="color:#666; font-size:0.8rem">TEMP. ACQUA</div><div class="card-val" id="d-temp-c" style="color:#4fc3f7">--°C</div></div>
                     <div class="card"><div style="color:#666; font-size:0.8rem">BATTERIA</div><div class="card-val" id="d-volt-c" style="color:#ffb74d">--V</div></div>
-                    <div class="card"><div style="color:#666; font-size:0.8rem">POS. ACCELERATORE</div><div class="card-val"><span id="d-thr">0</span>%</div></div>
+                    <div class="card">
+                        <div style="color:#666; font-size:0.8rem">POS. ACCELERATORE</div>
+                        <div class="card-val"><span id="d-thr">0</span>%</div>
+                        <div style="height:5px; background:#333; width:100%; margin-top:5px;"><div id="d-thr-bar" style="height:100%; background:var(--accent); width:0%"></div></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- ARCHIVIO MAPPE -->
             <div id="page-lib" class="content">
-                <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                    <h3>Libreria File Locali</h3>
-                    <button class="btn" onclick="refreshLib()">🔄 Aggiorna</button>
-                </div>
-                <table class="lib-table">
-                    <thead><tr><th>Nome File</th><th>Veicolo</th><th>ECU HW</th><th>Tipo</th><th>Azioni</th></tr></thead>
-                    <tbody id="lib-container"></tbody>
-                </table>
+                <div style="display:flex; justify-content:space-between; margin-bottom:20px;"><h3>Libreria File</h3><button class="btn" onclick="refreshLib()">🔄 Aggiorna</button></div>
+                <table class="lib-table"><thead><tr><th>Nome File</th><th>Veicolo</th><th>ECU HW</th><th>Tipo</th><th>Azioni</th></tr></thead><tbody id="lib-container"></tbody></table>
             </div>
 
-            <!-- TUNING -->
             <div id="page-tune" class="content">
                 <div class="ecu-info"><span>Connetti un veicolo per vedere i dati ID Centralina.</span></div>
-                
                 <div class="tuning-controls">
                     <button id="btn-read" class="btn" onclick="readECU()">⬇ LEGGI ECU</button>
+                    <button id="btn-load" class="btn" onclick="loadFile()">📂 CARICA BIN</button>
+                    <button id="btn-xdf" class="btn" onclick="loadXDF()" style="border-color:#2196f3; color:#2196f3">📄 CARICA XDF</button>
                     <button id="btn-save" class="btn" onclick="saveMod()">💾 SALVA MOD</button>
                     <button id="btn-write" class="btn primary" onclick="writeECU()">⬆ SCRIVI ECU</button>
-                    <div style="margin-left:auto; color:#666" id="file-lbl">Nessun file</div>
+                    <div style="margin-left:auto; color:#666; font-size:0.8rem" id="file-lbl">Nessun file</div>
                 </div>
 
                 <div class="sub-tabs">
                     <div class="sub-tab-item active" id="st-wiz" onclick="subTab('wiz')">Wizard (Stages)</div>
-                    <div class="sub-tab-item" id="st-hex" onclick="subTab('hex')">Editor Esadecimale</div>
+                    <div class="sub-tab-item" id="st-hex" onclick="subTab('hex')">Editor 2D & Hex</div>
                 </div>
 
                 <div id="sub-wiz">
                     <div class="stage-list">
-                        <div class="stage-card" onclick="applyStage('stage1')"><div class="stage-badge">SAFE</div><h3>🚀 Stage 1</h3><p style="color:#888;font-size:0.9rem">Ottimizzazione base. +25CV, +40Nm.</p></div>
+                        <div class="stage-card" onclick="applyStage('stage1')"><div class="stage-badge">SAFE</div><h3>🚀 Stage 1</h3><p style="color:#888;font-size:0.9rem">Incremento pressione turbo (+0.2 bar).</p></div>
                         <div class="stage-card" onclick="applyStage('popbang')"><div class="stage-badge">NOISY</div><h3>💥 Pop & Bang</h3><p style="color:#888;font-size:0.9rem">Scoppiettio in rilascio.</p></div>
-                        <div class="stage-card" onclick="applyStage('egroff')"><div class="stage-badge">OFFROAD</div><h3>🚫 EGR Delete</h3><p style="color:#888;font-size:0.9rem">Chiusura valvola EGR.</p></div>
+                        <div class="stage-card" onclick="applyStage('egroff')"><div class="stage-badge">OFFROAD</div><h3>🚫 EGR Delete</h3><p style="color:#888;font-size:0.9rem">Chiusura elettronica valvola EGR.</p></div>
                         <div class="stage-card" onclick="applyStage('restore')" style="border-color:#d32f2f"><h3>Oem Originale</h3><p style="color:#888;font-size:0.9rem">Ripristino di fabbrica.</p></div>
                     </div>
                 </div>
 
                 <div id="sub-hex" style="display:none">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                        <button class="btn" onclick="hexPage(-256)">Indietro</button>
-                        <span id="hex-addr" style="font-family:monospace; color:var(--accent)">0x0000</span>
-                        <button class="btn" onclick="hexPage(256)">Avanti</button>
+                    <div class="map-graph-container"><canvas id="map-canvas"></canvas></div>
+                    
+                    <div class="editor-container">
+                        <div class="map-list-panel">
+                            <div style="padding:10px; border-bottom:1px solid #333; font-weight:bold; color:#aaa">MAPPE IDENTIFICATE</div>
+                            <div id="map-list-content">
+                                <div style="padding:10px; color:#666; font-size:0.8rem">Carica un XDF per vedere le mappe.</div>
+                            </div>
+                        </div>
+
+                        <div style="flex:1;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                                <button class="btn" onclick="hexPage(-256)">Indietro</button>
+                                <span id="hex-addr" style="font-family:monospace; color:var(--accent)">0x0000</span>
+                                <button class="btn" onclick="hexPage(256)">Avanti</button>
+                            </div>
+                            <div class="hex-grid" id="hex-container"></div>
+                        </div>
                     </div>
-                    <div class="hex-grid" id="hex-container"></div>
                 </div>
             </div>
 
@@ -158,137 +192,128 @@
     </div>
 
     <script>
-        let currentHexOffset = 0;
-        let updateTimer = null;
-
+        let currentHexOffset = 0x4000; let updateTimer = null;
         async function api(name, ...args) { if(window.pywebview.api[name]) return await window.pywebview.api[name](...args); }
+        function showToast(t,m,tp="success"){const d=document.createElement("div");d.className=`toast ${tp}`;d.innerHTML=`<span class="toast-title">${t}</span><span class="toast-msg">${m}</span>`;document.getElementById("toast-container").appendChild(d);setTimeout(()=>d.classList.add("show"),100);setTimeout(()=>{d.classList.remove("show");setTimeout(()=>d.remove(),300)},4000);}
 
-        async function selectMode(mode) {
-            await api('set_mode', mode);
-            document.getElementById('landing-page').style.display = 'none';
-            document.getElementById('main-app').style.display = 'flex';
-            if(mode === 'sim') {
-                document.getElementById('conn-status').innerText = "CONNESSO (SIM)";
-                document.getElementById('conn-status').style.color = "var(--accent)";
-                document.getElementById('btn-open-sim').style.display = 'block';
-                updateTimer = setInterval(updateAll, 100);
+        async function selectMode(m){
+            await api('set_mode',m);
+            document.getElementById('landing-page').style.display='none';
+            document.getElementById('main-app').style.display='flex';
+            if(m==='sim'){
+                document.getElementById('conn-status').innerText="CONNESSO (SIM)";
+                document.getElementById('conn-status').style.color="var(--accent)";
+                document.getElementById('btn-open-sim').style.display='block';
+                document.getElementById('real-controls').style.display='none';
+                updateTimer=setInterval(updateAll,100);
             } else {
-                document.getElementById('btn-open-sim').style.display = 'none';
+                document.getElementById('btn-open-sim').style.display='none';
+                document.getElementById('real-controls').style.display='block';
+                scanPorts(); 
+                updateTimer=setInterval(updateAll,100);
             }
         }
 
-        async function updateAll() {
-            if(document.getElementById('page-diag').style.display !== 'none') {
-                const d = await api('get_data');
-                document.getElementById('d-rpm').innerText = d.rpm;
-                document.getElementById('d-spd').innerText = d.speed;
-                document.getElementById('d-temp-c').innerText = d.temp + "°C";
-                document.getElementById('d-volt-c').innerText = d.volt + "V";
-                document.getElementById('d-thr').innerText = d.throttle;
-                document.getElementById('d-volt-c').style.color = d.volt < 12.0 ? '#ff5252' : '#ffb74d';
+        async function scanPorts() {
+            const ports = await api('get_ports');
+            const sel = document.getElementById('ports');
+            sel.innerHTML = '';
+            if(!ports || ports.length === 0) {
+                let o=document.createElement('option'); o.innerText="Nessun device"; sel.appendChild(o);
+                return;
             }
-            const s = await api('get_flash_status');
-            document.getElementById('p-bar').style.width = s.progress + "%";
-            if(s.file_loaded) document.getElementById('file-lbl').innerText = "FILE: " + s.filename;
-            if(s.logs.length > 0) {
-                const logBox = document.getElementById('log-box');
-                logBox.innerHTML = s.logs.join('<br>') + '<br>_';
-                logBox.scrollTop = logBox.scrollHeight;
-            }
-            document.getElementById('btn-read').disabled = s.working;
-            document.getElementById('btn-write').disabled = s.working;
-            if(s.working) {
-                document.getElementById('btn-read').innerText = "OPERAZIONE IN CORSO...";
-                document.getElementById('btn-write').innerText = "ATTENDERE...";
-            } else {
-                document.getElementById('btn-read').innerText = "⬇ LEGGI ECU";
-                document.getElementById('btn-write').innerText = "⬆ SCRIVI ECU";
-            }
+            ports.forEach(p => { let o=document.createElement('option'); o.value=p; o.innerText=p; sel.appendChild(o); });
         }
 
-        function nav(page) {
-            document.querySelectorAll('.content').forEach(e => { e.classList.remove('active'); e.style.display = 'none'; });
-            document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
-            document.getElementById('page-'+page).classList.add('active');
-            document.getElementById('page-'+page).style.display = 'block';
-            document.getElementById('nav-'+page).classList.add('active');
-            const titles = { 'diag': 'Diagnostica', 'tune': 'Suite di Rimappatura', 'lib': 'Archivio Mappe' };
-            document.getElementById('page-title').innerText = titles[page];
-            if(page === 'tune') { renderHex(); updateECUInfo(); }
-            if(page === 'lib') refreshLib();
+        async function connect() {
+            const p = document.getElementById('ports').value;
+            if(!p || p==="Nessun device") return;
+            const r = await api('connect_ecu', p);
+            if(r.status==='success') {
+                document.getElementById('btn-conn').style.display='none';
+                document.getElementById('btn-disc').style.display='block';
+                document.getElementById('conn-status').innerText="CONNESSO: "+p;
+                document.getElementById('conn-status').style.color="var(--accent)";
+            } else showToast("Errore", r.msg, "error");
         }
 
-        function subTab(tab) {
-            document.getElementById('sub-wiz').style.display = tab === 'wiz' ? 'block' : 'none';
-            document.getElementById('sub-hex').style.display = tab === 'hex' ? 'block' : 'none';
-            document.getElementById('st-wiz').classList.toggle('active', tab === 'wiz');
-            document.getElementById('st-hex').classList.toggle('active', tab === 'hex');
-            if(tab === 'hex') renderHex();
+        async function disconnect() {
+            await api('disconnect');
+            document.getElementById('btn-conn').style.display='block';
+            document.getElementById('btn-disc').style.display='none';
+            document.getElementById('conn-status').innerText="DISCONNESSO";
+            document.getElementById('conn-status').style.color="#666";
         }
 
-        async function updateECUInfo() {
+        async function updateAll(){
             try {
-                const info = await api('get_ecu_info');
-                if(info) document.querySelector('.ecu-info').innerHTML = `<div>HW: <span style="color:white">${info.ecu_hw}</span></div><div>SW: <span style="color:white">${info.ecu_sw}</span></div><div>VEICOLO: <span style="color:var(--accent); font-weight:bold">${info.name}</span></div>`;
+                if(document.getElementById('page-diag').style.display!=='none'){
+                    const d=await api('get_data');
+                    if(d) {
+                        document.getElementById('d-rpm').innerText=d.rpm;
+                        document.getElementById('d-spd').innerText=d.speed;
+                        document.getElementById('d-temp-c').innerText=d.temp+"°C";
+                        document.getElementById('d-volt-c').innerText=d.volt+"V";
+                        document.getElementById('d-thr').innerText=d.throttle;
+                        const thrBar = document.getElementById('d-thr-bar');
+                        if(thrBar) thrBar.style.width=d.throttle+"%";
+                    }
+                }
+                const s=await api('get_flash_status');
+                if(s) {
+                    const pBar = document.getElementById('p-bar');
+                    if(pBar) pBar.style.width=s.progress+"%";
+                    if(s.file_loaded) document.getElementById('file-lbl').innerText=s.filename;
+                    if(s.logs && s.logs.length>0){const l=document.getElementById('log-box');l.innerHTML=s.logs.join('<br>')+'<br>_';l.scrollTop=l.scrollHeight;}
+                    
+                    document.getElementById('btn-read').disabled=s.working;
+                    document.getElementById('btn-write').disabled=s.working;
+                    
+                    // FIX: Visual Feedback sui pulsanti
+                    if(s.working) {
+                        document.getElementById('btn-read').innerText = "LETTURA IN CORSO...";
+                        document.getElementById('btn-write').innerText = "SCRITTURA IN CORSO...";
+                    } else {
+                        document.getElementById('btn-read').innerText = "⬇ LEGGI ECU";
+                        document.getElementById('btn-write').innerText = "⬆ SCRIVI ECU";
+                    }
+                }
             } catch(e) {}
         }
+        
+        function nav(p){document.querySelectorAll('.content').forEach(e=>{e.classList.remove('active');e.style.display='none'});document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.getElementById('page-'+p).style.display='block';document.getElementById('nav-'+p).classList.add('active');if(p==='tune'){renderHex();updateECUInfo();loadMapList();}if(p==='lib')refreshLib();}
+        function subTab(t){document.getElementById('sub-wiz').style.display=t==='wiz'?'block':'none';document.getElementById('sub-hex').style.display=t==='hex'?'block':'none';document.getElementById('st-wiz').classList.toggle('active',t==='wiz');document.getElementById('st-hex').classList.toggle('active',t==='hex');if(t==='hex'){renderHex();loadMapList();}}
+        
+        async function loadMapList(){const maps=await api('get_defined_maps');const c=document.getElementById('map-list-content');c.innerHTML='';if(!maps||Object.keys(maps).length===0){c.innerHTML='<div style="padding:10px;color:#666;font-size:0.8rem">Carica un XDF per vedere le mappe.</div>';return;}for(const[name,data]of Object.entries(maps)){c.innerHTML+=`<div class="map-item" onclick="jumpTo(0x${data.address.toString(16)})"><div style="font-weight:bold">${name}</div><div style="font-size:0.7rem;color:#666">Addr: 0x${data.address.toString(16).toUpperCase()}</div></div>`;}}
+        function jumpTo(addr){ currentHexOffset = addr; renderHex(); }
 
-        async function refreshLib() {
-            const maps = await api('get_library_maps');
-            const c = document.getElementById('lib-container');
-            c.innerHTML = '';
-            maps.forEach(m => {
-                const typeClass = m.type === 'ORI' ? 'ori' : 'mod';
-                c.innerHTML += `<tr><td>${m.filename}</td><td>${m.name}</td><td>${m.ecu}</td><td><span class="tag ${typeClass}">${m.type}</span></td><td><button class="btn" onclick="loadLibMap('${m.filename}')">Carica</button> <button class="btn danger" onclick="delMap('${m.filename}')">X</button></td></tr>`;
-            });
+        async function updateECUInfo(){try{const i=await api('get_ecu_info');if(i)document.querySelector('.ecu-info').innerHTML=`<div>HW: <span style="color:white">${i.ecu_hw}</span></div><div>VEICOLO: <span style="color:var(--accent);font-weight:bold">${i.name}</span></div>`;}catch(e){}}
+        async function refreshLib(){const m=await api('get_library_maps');const c=document.getElementById('lib-container');c.innerHTML='';m.forEach(x=>{c.innerHTML+=`<tr><td>${x.filename}</td><td>${x.name}</td><td>${x.ecu}</td><td><span class="tag ${x.type==='ORI'?'ori':'mod'}">${x.type}</span></td><td><button class="btn" onclick="loadLibMap('${x.filename}')">Load</button> <button class="btn danger" onclick="delMap('${x.filename}')">X</button></td></tr>`;});}
+        async function loadLibMap(f){const r=await api('load_map_from_library',f);if(r.status==='success'){showToast("Caricato",r.msg);nav('tune');}else showToast("Errore",r.msg,"error");}
+        async function delMap(f){if(confirm('Elimina?')){await api('delete_library_map',f);refreshLib();}}
+        async function saveMod(){const n=prompt("Nome MOD:","Stage1");if(n){const r=await api('save_current_map',n);showToast(r.status==='success'?"Salvato":"Errore",r.msg,r.status);refreshLib();}}
+        async function readECU(){
+            showToast("Avvio Lettura", "Attendere il completamento...");
+            await api('read_ecu');
         }
-
-        async function loadLibMap(fname) {
-            const r = await api('load_map_from_library', fname);
-            if(r.status==='success') { alert(r.msg); nav('tune'); } else alert(r.msg);
-        }
-        async function delMap(fname) { if(confirm('Eliminare ' + fname + '?')) { await api('delete_library_map', fname); refreshLib(); } }
-        async function saveMod() {
-            const name = prompt("Inserisci nome per la MOD (es. Stage1):", "Mod1");
-            if(name) { const r = await api('save_current_map', name); alert(r.msg); }
-        }
-
-        async function readECU() { await api('read_ecu'); }
-        async function writeECU() { const r = await api('write_ecu'); if(r.status==='error') alert(r.msg); }
-        async function applyStage(n) { const r = await api('apply_wizard_stage', n); if(r.status==='error') alert(r.msg); else { alert("Stage applicato!"); renderHex(); } }
-
-        async function renderHex() {
-            const data = await api('get_hex_view', currentHexOffset);
-            const container = document.getElementById('hex-container');
-            container.innerHTML = '<div></div>'; 
-            for(let i=0; i<16; i++) container.innerHTML += `<div class="hex-header">${i.toString(16).toUpperCase()}</div>`;
-            for(let i=0; i<data.length; i+=16) {
-                const offset = currentHexOffset + i;
-                container.innerHTML += `<div class="hex-offset">0x${offset.toString(16).padStart(4,'0').toUpperCase()}</div>`;
-                for(let j=0; j<16; j++) {
-                    if(i+j < data.length) {
-                        const byteVal = data[i+j];
-                        const byteStr = byteVal.toString(16).padStart(2,'0').toUpperCase();
-                        const style = (byteStr === "FF" || byteStr === "00") ? "color:var(--accent)" : "color:#888"; 
-                        container.innerHTML += `<div class="hex-cell" style="${style}" onclick="editByte(${offset+j}, '${byteStr}')">${byteStr}</div>`;
-                    } else container.innerHTML += `<div></div>`;
-                }
+        async function loadFile(){const f=await api('choose_file');if(f){document.getElementById('file-lbl').innerText=f; loadMapList();}}
+        async function loadXDF(){const r=await api('load_xdf_file');if(r.status==='success'){showToast("XDF Caricato",r.msg);loadMapList();}else showToast("Errore XDF",r.msg,"error");}
+        async function writeECU(){const r=await api('write_ecu');if(r.status==='error')showToast("Errore",r.msg,"error");}
+        async function applyStage(n){const r=await api('apply_wizard_stage',n);if(r.status==='error')showToast("Attenzione",r.msg,"error");else{showToast("Applicato!",r.msg,"success");renderHex();}}
+        async function renderHex(){
+            const res=await api('get_hex_view_with_graph',currentHexOffset);
+            drawGraph(res.current,res.original);
+            const container=document.getElementById('hex-container');container.innerHTML='<div></div>';
+            for(let i=0;i<16;i++)container.innerHTML+=`<div class="hex-header">${i.toString(16).toUpperCase()}</div>`;
+            for(let i=0;i<res.current.length;i+=16){
+                const off=currentHexOffset+i;container.innerHTML+=`<div class="hex-offset">0x${off.toString(16).padStart(4,'0').toUpperCase()}</div>`;
+                for(let j=0;j<16;j++){if(i+j<res.current.length){const b=res.current[i+j];const bs=b.toString(16).padStart(2,'0').toUpperCase();const isMod=b!==res.original[i+j];const style=isMod?"color:var(--danger);font-weight:bold":"color:#888";container.innerHTML+=`<div class="hex-cell" style="${style}" onclick="editByte(${off+j},'${bs}')">${bs}</div>`;}else container.innerHTML+=`<div></div>`;}
             }
-            document.getElementById('hex-addr').innerText = `OFFSET: 0x${currentHexOffset.toString(16).toUpperCase()}`;
+            document.getElementById('hex-addr').innerText=`OFFSET: 0x${currentHexOffset.toString(16).toUpperCase()}`;
         }
-
-        async function editByte(offset, currentVal) {
-            const newVal = prompt(`Modifica Byte 0x${offset.toString(16).toUpperCase()}:`, currentVal);
-            if(newVal !== null && /^[0-9A-Fa-f]{2}$/.test(newVal)) {
-                await api('update_hex', offset, newVal);
-                renderHex();
-            }
-        }
-
-        function hexPage(delta) {
-            const n = currentHexOffset + delta;
-            if(n >= 0) { currentHexOffset = n; renderHex(); }
-        }
+        function drawGraph(curr,orig){const cvs=document.getElementById('map-canvas');const ctx=cvs.getContext('2d');const w=cvs.width=cvs.offsetWidth;const h=cvs.height=cvs.offsetHeight;ctx.clearRect(0,0,w,h);ctx.beginPath();ctx.strokeStyle='#444';ctx.lineWidth=2;for(let i=0;i<orig.length;i++){const x=(i/orig.length)*w;const y=h-(orig[i]/255)*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();ctx.beginPath();ctx.strokeStyle='#00ff88';ctx.lineWidth=2;for(let i=0;i<curr.length;i++){const x=(i/curr.length)*w;const y=h-(curr[i]/255)*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();}
+        async function editByte(o,c){const n=prompt("Byte:",c);if(n!==null&&/^[0-9A-Fa-f]{2}$/.test(n)){await api('update_hex',o,n);renderHex();}}
+        function hexPage(d){const n=currentHexOffset+d;if(n>=0){currentHexOffset=n;renderHex();}}
     </script>
 </body>
 </html>

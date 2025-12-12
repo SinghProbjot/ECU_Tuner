@@ -27,7 +27,8 @@
         
         .ign-btn { width: 80px; height: 80px; border-radius: 50%; border: 4px solid #333; background: #111; color: white; font-weight: bold; cursor: pointer; margin-bottom: 20px;}
         .ign-btn.on { border-color: #00ff88; color: #00ff88; box-shadow: 0 0 20px rgba(0,255,136,0.2); }
-        #loading-msg { text-align: center; color: #666; margin-top: 50px; }
+        #loading-msg { text-align: center; color: #666; margin-top: 50px; font-family: monospace; }
+        #error-details { color: #ff5252; font-size: 0.8rem; margin-top: 10px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -36,26 +37,24 @@
         <h1 style="margin:0">SELEZIONA VEICOLO</h1>
         <p style="color:#666">Scegli l'auto da caricare sul banco prova</p>
         <div id="loading-msg">Caricamento Garage...</div>
+        <div id="error-details"></div>
         <div class="car-list" id="car-list-container" style="display:none"></div>
     </div>
 
     <div id="driving-ui">
         <div style="width:100%; text-align:center; margin-bottom:10px; font-weight:bold; color:#888" id="car-title">AUTO</div>
         <button class="ign-btn" id="btn-start" onclick="toggleIgnition()">START</button>
-        
         <div class="dash">
             <div><div class="val" id="rpm" style="color:#ff9100">0</div><div class="label">RPM</div></div>
             <div><div class="val" id="gear" style="color:white">P</div><div class="label">GEAR</div></div>
             <div><div class="val" id="speed" style="color:#00ff88">0</div><div class="label">KM/H</div></div>
         </div>
-
         <div class="shifter">
             <button class="gear-btn active" id="btn-P" onclick="setGear('P')">P</button>
             <button class="gear-btn" id="btn-R" onclick="setGear('R')">R</button>
             <button class="gear-btn" id="btn-N" onclick="setGear('N')">N</button>
             <button class="gear-btn" id="btn-D" onclick="setGear('D')">D</button>
         </div>
-
         <div class="pedals">
             <div style="text-align:center">
                 <input type="range" orient="vertical" min="0" max="1" step="0.01" value="0" id="in-brk" oninput="input()">
@@ -69,27 +68,47 @@
     </div>
 
     <script>
+        // MOCK DI EMERGENZA (Solo per preview senza Python)
         if(typeof pywebview === 'undefined') window.pywebview = { api: { 
             get_available_cars: async()=>({ "demo": {name:"Demo Car", hp:100, ecu_hw:"DemoECU"} }),
-            select_sim_car: async()=>({}), sim_control: async()=>{}, get_sim_state: async()=>({rpm:0, speed:0, gear:'P', engine_on:false}) 
+            select_sim_car: async()=>({name:"Demo"}), sim_control: async()=>{}, get_sim_state: async()=>({rpm:0,speed:0,gear:'P',engine_on:false}) 
         }};
 
         window.addEventListener('pywebviewready', loadGarage);
 
         async function loadGarage() {
             try {
+                // CORRETTO: Usa get_available_cars (che è definita in app.py)
                 const cars = await pywebview.api.get_available_cars();
                 const container = document.getElementById('car-list-container');
                 container.innerHTML = '';
                 
-                if (!cars || Object.keys(cars).length === 0) return;
-
-                for(const [id, car] of Object.entries(cars)) {
-                    container.innerHTML += `<div class="car-card" onclick="selectCar('${id}')"><div><div class="car-name">${car.name}</div><div class="car-specs">${car.hp} HP | ECU: ${car.ecu_hw}</div></div><div style="font-size:1.5rem">🚗</div></div>`;
+                // Se cars è null o vuoto
+                if (!cars || Object.keys(cars).length === 0) {
+                    document.getElementById('loading-msg').innerText = "Database vuoto o errore connessione.";
+                    return;
                 }
+
+                // Iterazione corretta su Dizionario
+                for(const [id, car] of Object.entries(cars)) {
+                    container.innerHTML += `
+                        <div class="car-card" onclick="selectCar('${id}')">
+                            <div>
+                                <div class="car-name">${car.name}</div>
+                                <div class="car-specs">${car.hp} HP | ECU: ${car.ecu_hw}</div>
+                            </div>
+                            <div style="font-size:1.5rem">🚗</div>
+                        </div>
+                    `;
+                }
+                
                 document.getElementById('loading-msg').style.display = 'none';
                 container.style.display = 'flex';
-            } catch (e) { document.getElementById('loading-msg').innerText = "Errore backend."; }
+                
+            } catch (e) {
+                document.getElementById('loading-msg').innerText = "Errore Caricamento.";
+                document.getElementById('error-details').innerText = e.toString();
+            }
         }
 
         async function selectCar(id) {
@@ -97,56 +116,34 @@
             document.getElementById('garage-overlay').style.display = 'none';
             document.getElementById('driving-ui').style.display = 'flex';
             document.getElementById('car-title').innerText = specs.name.toUpperCase();
-            
-            // Loop aggiornamento UI
             setInterval(updateDash, 50);
         }
 
-        let engineState = false; // Stato locale per il toggle
-
+        let eng = false;
         async function updateDash() {
             try {
                 const d = await pywebview.api.get_sim_state();
-                
                 document.getElementById('rpm').innerText = d.rpm;
                 document.getElementById('speed').innerText = d.speed;
-                
-                // Fix visualizzazione gear (usa P se undefined)
                 document.getElementById('gear').innerText = d.gear || 'P';
-                
-                // Aggiorna stato motore
-                engineState = d.engine_on;
+                eng = d.engine_on;
                 const btn = document.getElementById('btn-start');
-                
-                if(engineState) {
-                    btn.classList.add('on');
-                    btn.innerText = "STOP";
-                } else {
-                    btn.classList.remove('on');
-                    btn.innerText = "START";
-                }
+                if(eng) { btn.classList.add('on'); btn.innerText = "STOP"; } else { btn.classList.remove('on'); btn.innerText = "START"; }
             } catch(e) {}
         }
 
         function input() {
-            // Invio valori sicuri (mai null)
             const t = document.getElementById('in-thr').value || "0";
             const b = document.getElementById('in-brk').value || "0";
             pywebview.api.sim_control(t, b, null, null);
         }
-
         function setGear(g) {
-            // Aggiorna classe visuale subito per feedback istantaneo
+            pywebview.api.sim_control(null, null, g, null);
             document.querySelectorAll('.gear-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('btn-'+g).classList.add('active');
-            
-            // Invia al backend
-            pywebview.api.sim_control(null, null, g, null);
         }
-
         function toggleIgnition() {
-            // Inverti lo stato attuale
-            pywebview.api.sim_control(null, null, null, !engineState);
+            pywebview.api.sim_control(null, null, null, !eng);
         }
     </script>
 </body>
