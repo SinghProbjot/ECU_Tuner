@@ -1,3 +1,7 @@
 pywebview
 pyserial
 pyinstaller
+pythonnet
+pyqt5
+qtpy
+pyqtwebengine
